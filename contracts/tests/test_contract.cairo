@@ -1,5 +1,5 @@
 use snforge_std::{declare, ContractClassTrait, start_cheat_block_timestamp_global, start_cheat_caller_address_global};
-use moon_or_doom::{RoundState, IMoonOrDoomDispatcher, IMoonOrDoomDispatcherTrait};
+use moon_or_doom::{RoundState, Bet, IMoonOrDoomDispatcher, IMoonOrDoomDispatcherTrait};
 use starknet::{contract_address_const};
 
  // Helper function to deploy the contract
@@ -90,11 +90,11 @@ fn bet_when_active_round_should_place_bet() {
 
     // Place a bet
     start_cheat_caller_address_global(caller);
-    contract.bet(true);
+    contract.bet(Bet::MOON);
 
     // Check if the bet was placed correctly
     let bet_info = contract.get_bet_info(caller, 1);
-    assert(bet_info == true, 'Bet should be placed as moon');
+    assert(bet_info == Bet::MOON, 'Bet should be placed as MOON');
 }
 
 #[test]
@@ -111,7 +111,7 @@ fn bet_when_no_active_round_should_panic() {
 
     // Attempt to place a bet after the round has ended
     start_cheat_caller_address_global(caller);
-    contract.bet(true); // This should panic
+    contract.bet(Bet::DOOM); // This should panic
 }
 
 #[test]
@@ -122,7 +122,7 @@ fn bet_when_no_rounds_have_been_created_should_panic() {
 
     // Attempt to place a bet without starting a round
     start_cheat_caller_address_global(caller);
-    contract.bet(false); // This should panic
+    contract.bet(Bet::MOON); // This should panic
 }
 
 #[test]
@@ -179,39 +179,33 @@ fn get_bet_info_should_return_correct_details() {
 
     // Place a bet
     start_cheat_caller_address_global(caller);
-    contract.bet(true);
+    contract.bet(Bet::MOON);
 
     // Get bet info
     let bet_info = contract.get_bet_info(caller, 1);
 
     // Assert correct details
-    assert(bet_info == true, 'Bet should be moon (true)');
+    assert(bet_info == Bet::MOON, 'Bet should be MOON');
 
     // Place another bet in the same round
     let another_caller = contract_address_const::<2>();
     start_cheat_caller_address_global(another_caller);
-    contract.bet(false);
+    contract.bet(Bet::DOOM);
 
     // Get bet info for the second caller
     let another_bet_info = contract.get_bet_info(another_caller, 1);
 
     // Assert correct details for the second bet
-    assert(another_bet_info == false, 'Bet should be doom (false)');
+    assert(another_bet_info == Bet::DOOM, 'Bet should be DOOM');
 }
 
 #[test]
-// #[should_panic()]
+#[should_panic()]
 fn get_bet_info_when_bet_does_not_exist_should_panic() {
     let contract = deploy_contract();
     let caller = contract_address_const::<1>();
 
     // Attempt to get bet info when no bets have been placed
-    let bet_info = contract.get_bet_info(caller, 1);
-    
-    // This should panic, but if it doesn't, we'll assert that the returned value is false
-    // as there should be no bet for a non-existent round
-    assert(bet_info == false, 'blah');
+    // This should panic
+    contract.get_bet_info(caller, 1);
 }
-
-
-

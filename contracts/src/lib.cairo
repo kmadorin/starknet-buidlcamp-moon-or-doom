@@ -6,14 +6,21 @@ pub enum RoundState {
     Ended,
 }
 
+#[derive(Drop, Copy, Serde, PartialEq, starknet::Store)]
+pub enum Bet {
+    DEFAULT,
+    MOON,
+    DOOM,
+}
+
 #[starknet::interface]
 pub trait IMoonOrDoom<TContractState> {
     fn start_round(ref self: TContractState, start_price: u128);
     fn end_round(ref self: TContractState, end_price: u128);
-    fn bet(ref self: TContractState, moon: bool);
+    fn bet(ref self: TContractState, bet: Bet);
 
     fn get_round_info(self: @TContractState) -> (usize, RoundState, u64, u64, u128, u128);
-    fn get_bet_info(self: @TContractState, user:ContractAddress, round_index: usize) -> bool;
+    fn get_bet_info(self: @TContractState, user:ContractAddress, round_index: usize) -> Bet;
 }
 
 #[starknet::contract]
@@ -24,7 +31,7 @@ mod MoonOrDoom {
         Map, StoragePointerReadAccess,
         StoragePointerWriteAccess, StoragePathEntry
     };
-    use super::RoundState;
+    use super::{RoundState, Bet};
 
     #[derive(Serde, Copy, Drop, starknet::Store)]
     struct Round {
@@ -33,11 +40,6 @@ mod MoonOrDoom {
         end_timestamp: u64,
         start_price: u128,
         end_price: u128,
-    }
-
-    #[derive(Serde, Copy, Drop, starknet::Store)]
-    struct Bet {
-        moon: bool,
     }
 
     #[storage]
@@ -90,18 +92,13 @@ mod MoonOrDoom {
             self.rounds.entry(round_count).write(round);
         }
 
-        fn bet(ref self: ContractState, moon: bool) {
+        fn bet(ref self: ContractState, bet: Bet) {
             let round_count = self.round_count.read();
             let round = self.rounds.entry(round_count).read();
             let caller = get_caller_address();
 
             assert(round.state == RoundState::Active, 'Round is not active');
             
-            let bet = Bet {
-                moon: moon,
-            };
-
-
             self.bets.entry(caller).entry(round_count.into()).write(bet);
         }
 
@@ -113,10 +110,8 @@ mod MoonOrDoom {
             (round_count, round.state, round.start_timestamp, round.end_timestamp, round.start_price, round.end_price)
         }
 
-        fn get_bet_info(self: @ContractState, user: ContractAddress, round_index: usize) -> bool {
-            let bet =self.bets.entry(user).entry(round_index.into()).read();
-            
-            bet.moon
+        fn get_bet_info(self: @ContractState, user: ContractAddress, round_index: usize) -> Bet {
+            self.bets.entry(user).entry(round_index.into()).read()
         }
     }
 }
