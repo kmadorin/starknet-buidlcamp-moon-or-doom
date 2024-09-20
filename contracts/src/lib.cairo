@@ -1,6 +1,6 @@
 use starknet::contract_address::ContractAddress;
 
-#[derive(Drop, Serde, starknet::Store)]
+#[derive(Drop, Serde, PartialEq, starknet::Store)]
 enum RoundState {
     Active,
     Ended,
@@ -13,7 +13,7 @@ pub trait IMoonOrDoom<TContractState> {
     fn bet(ref self: TContractState, moon: bool);
 
     fn get_round_info(self: @TContractState) -> (RoundState, u64, u64, u128, u128);
-    fn get_bet_info(self: @TContractState, user:ContractAddress, round_index: usize) -> (bool);
+    fn get_bet_info(self: @TContractState, user:ContractAddress, round_index: usize) -> bool;
 }
 
 #[starknet::contract]
@@ -21,8 +21,8 @@ mod MoonOrDoom {
     use starknet::contract_address::ContractAddress;
     use starknet::{get_block_timestamp, get_caller_address};
     use starknet::storage::{
-        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
-        StoragePointerWriteAccess
+        Map, StoragePointerReadAccess,
+        StoragePointerWriteAccess, StoragePathEntry
     };
     use super::RoundState;
 
@@ -80,7 +80,7 @@ mod MoonOrDoom {
             let round = self.rounds.entry(round_count).read();
             let caller = get_caller_address();
 
-            assert(round.state == RoundState::Active, "Round is not active");
+            assert(round.state == RoundState::Active, 'Round is not active');
             
             let bet = Bet {
                 moon: moon,
@@ -97,7 +97,7 @@ mod MoonOrDoom {
             (round.state, round.start_timestamp, round.end_timestamp, round.start_price, round.end_price)
         }
 
-        fn get_bet_info(self: @ContractState, user: ContractAddress, round_index: usize) -> (bool) {
+        fn get_bet_info(self: @ContractState, user: ContractAddress, round_index: usize) -> bool {
             let bet =self.bets.entry(user).entry(round_index.into()).read();
             
             bet.moon
