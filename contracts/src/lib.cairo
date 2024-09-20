@@ -54,12 +54,13 @@ mod MoonOrDoom {
 
     #[abi(embed_v0)]
     impl MoonOrDoomImpl of super::IMoonOrDoom<ContractState> {
+
         fn start_round(ref self: ContractState, start_price: u128) {
             let round_count = self.round_count.read();
             
             // Check if there's an active round
             if round_count > 0 {
-                let current_round = self.rounds.entry(round_count - 1).read();
+                let current_round = self.rounds.entry(round_count).read();
                 assert(current_round.state == RoundState::Ended, 'Round is already active');
             }
 
@@ -71,21 +72,22 @@ mod MoonOrDoom {
                 end_price: 0,
             };
 
-            self.rounds.entry(round_count + 1).write(round);
-            self.round_count.write(round_count + 1);
+            let new_round_index = round_count + 1;
+
+            self.rounds.entry(new_round_index).write(round);
+            self.round_count.write(new_round_index);
         }
 
         fn end_round(ref self: ContractState, end_price: u128) {
             let round_count = self.round_count.read();
-            assert(round_count > 0, 'No rounds have been started');
 
-            let mut round = self.rounds.entry(round_count - 1).read();
+            let mut round = self.rounds.entry(round_count).read();
             assert(round.state == RoundState::Active, 'No active round to end');
 
             round.state = RoundState::Ended;
             round.end_timestamp = get_block_timestamp();
             round.end_price = end_price;
-            self.rounds.entry(round_count - 1).write(round);
+            self.rounds.entry(round_count).write(round);
         }
 
         fn bet(ref self: ContractState, moon: bool) {
@@ -105,6 +107,7 @@ mod MoonOrDoom {
 
         fn get_round_info(self: @ContractState) -> (usize,RoundState, u64, u64, u128, u128) {
             let round_count = self.round_count.read();
+
             let round = self.rounds.entry(round_count).read();
             
             (round_count, round.state, round.start_timestamp, round.end_timestamp, round.start_price, round.end_price)
