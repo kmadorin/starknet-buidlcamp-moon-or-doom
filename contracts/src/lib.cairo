@@ -1,6 +1,6 @@
 use starknet::contract_address::ContractAddress;
 
-#[derive(Drop, Serde)]
+#[derive(Drop, Serde, starknet::Store)]
 enum RoundState {
     Active,
     Ended,
@@ -13,7 +13,7 @@ pub trait IMoonOrDoom<TContractState> {
     fn bet(ref self: TContractState, moon: bool);
 
     fn get_round_info(self: @TContractState) -> (RoundState, u64, u64, u128, u128);
-    fn get_bet_info(self: @TContractState, user:ContractAddress, round_index: u256) -> (bool);
+    fn get_bet_info(self: @TContractState, user:ContractAddress, round_index: usize) -> (bool);
 }
 
 #[starknet::contract]
@@ -26,6 +26,7 @@ mod MoonOrDoom {
     };
     use super::RoundState;
 
+    #[derive(starknet::Store)]
     struct Round {
         state: RoundState,
         start_timestamp: u64,
@@ -34,16 +35,16 @@ mod MoonOrDoom {
         end_price: u128,
     }
 
+    #[derive(starknet::Store)]
     struct Bet {
         moon: bool,
     }
 
     #[storage]
     struct Storage {
-        round_count: u256,
-        rounds: Map::<u256, Round>,
-        bets: Map::<ContractAddress, Map::<u256, Bet>>,
-        test: Map::<u256, u256>,
+        round_count: usize,
+        rounds: Map::<usize, Round>,
+        bets: Map::<ContractAddress, Map::<usize, Bet>>,
     }
 
     #[constructor]
@@ -86,18 +87,18 @@ mod MoonOrDoom {
             };
 
 
-            self.bets.entry(caller).entry(round_count).write(bet);
+            self.bets.entry(caller).entry(round_count.into()).write(bet);
         }
 
         fn get_round_info(self: @ContractState) -> (RoundState, u64, u64, u128, u128) {
             let round_count = self.round_count.read();
-            let Round {state, start_timestamp, end_timestamp, start_price, end_price} = self.rounds.entry(round_count).read();
+            let round = self.rounds.entry(round_count).read();
             
-            (state, start_timestamp, end_timestamp, start_price, end_price)
+            (round.state, round.start_timestamp, round.end_timestamp, round.start_price, round.end_price)
         }
 
-        fn get_bet_info(self: @ContractState, user: ContractAddress, round_index: u256) -> (bool) {
-            let bet =self.bets.entry(user).entry(round_index).read();
+        fn get_bet_info(self: @ContractState, user: ContractAddress, round_index: usize) -> (bool) {
+            let bet =self.bets.entry(user).entry(round_index.into()).read();
             
             bet.moon
         }
