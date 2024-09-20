@@ -1,7 +1,7 @@
 use starknet::contract_address::ContractAddress;
 
-#[derive(Drop, Serde, PartialEq, starknet::Store)]
-enum RoundState {
+#[derive(Drop, Copy, Serde, PartialEq, starknet::Store)]
+pub enum RoundState {
     Active,
     Ended,
 }
@@ -12,7 +12,7 @@ pub trait IMoonOrDoom<TContractState> {
     fn end_round(ref self: TContractState, end_price: u128);
     fn bet(ref self: TContractState, moon: bool);
 
-    fn get_round_info(self: @TContractState) -> (RoundState, u64, u64, u128, u128);
+    fn get_round_info(self: @TContractState) -> (usize, RoundState, u64, u64, u128, u128);
     fn get_bet_info(self: @TContractState, user:ContractAddress, round_index: usize) -> bool;
 }
 
@@ -26,7 +26,7 @@ mod MoonOrDoom {
     };
     use super::RoundState;
 
-    #[derive(starknet::Store)]
+    #[derive(Serde, Copy, Drop, starknet::Store)]
     struct Round {
         state: RoundState,
         start_timestamp: u64,
@@ -35,7 +35,7 @@ mod MoonOrDoom {
         end_price: u128,
     }
 
-    #[derive(starknet::Store)]
+    #[derive(Serde, Copy, Drop, starknet::Store)]
     struct Bet {
         moon: bool,
     }
@@ -56,6 +56,13 @@ mod MoonOrDoom {
     impl MoonOrDoomImpl of super::IMoonOrDoom<ContractState> {
         fn start_round(ref self: ContractState, start_price: u128) {
             let round_count = self.round_count.read();
+            
+            // Check if there's an active round
+            if round_count > 0 {
+                let current_round = self.rounds.entry(round_count - 1).read();
+                assert(current_round.state == RoundState::Ended, 'Round is already active');
+            }
+
             let round = Round {
                 state: RoundState::Active,
                 start_timestamp: get_block_timestamp(),
@@ -64,15 +71,21 @@ mod MoonOrDoom {
                 end_price: 0,
             };
 
-            self.rounds.entry(round_count).write(round);
+            self.rounds.entry(round_count + 1).write(round);
             self.round_count.write(round_count + 1);
         }
 
         fn end_round(ref self: ContractState, end_price: u128) {
             let round_count = self.round_count.read();
-            let round = self.rounds.entry(round_count).read();
-            round.end_price.write(end_price);
-            self.rounds.entry(round_count).write(round);
+            assert(round_count > 0, 'No rounds have been started');
+
+            let mut round = self.rounds.entry(round_count - 1).read();
+            assert(round.state == RoundState::Active, 'No active round to end');
+
+            round.state = RoundState::Ended;
+            round.end_timestamp = get_block_timestamp();
+            round.end_price = end_price;
+            self.rounds.entry(round_count - 1).write(round);
         }
 
         fn bet(ref self: ContractState, moon: bool) {
@@ -90,11 +103,11 @@ mod MoonOrDoom {
             self.bets.entry(caller).entry(round_count.into()).write(bet);
         }
 
-        fn get_round_info(self: @ContractState) -> (RoundState, u64, u64, u128, u128) {
+        fn get_round_info(self: @ContractState) -> (usize,RoundState, u64, u64, u128, u128) {
             let round_count = self.round_count.read();
             let round = self.rounds.entry(round_count).read();
             
-            (round.state, round.start_timestamp, round.end_timestamp, round.start_price, round.end_price)
+            (round_count, round.state, round.start_timestamp, round.end_timestamp, round.start_price, round.end_price)
         }
 
         fn get_bet_info(self: @ContractState, user: ContractAddress, round_index: usize) -> bool {
@@ -102,6 +115,5 @@ mod MoonOrDoom {
             
             bet.moon
         }
-        
     }
 }
