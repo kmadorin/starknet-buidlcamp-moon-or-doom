@@ -84,7 +84,7 @@ const DemoComponentStarknetJS: React.FC<DemoComponentProps> = (props) => {
 		if (account) {
 			try {
 				const contract = new Contract(contractAbi, contractAddress, account);
-				await contract.bet(new CairoCustomEnum({DEFAULT: 0}));
+				await contract.bet(new CairoCustomEnum({MOON: 1}));
 			} catch (err) {
 				console.log('####: err: ', err);
 			}
@@ -94,7 +94,7 @@ const DemoComponentStarknetJS: React.FC<DemoComponentProps> = (props) => {
 	async function handleGetBetInfo() {
 		try {
 			const contract = new Contract(contractAbi, contractAddress, account);
-			await contract.get_bet_info(account, 1);
+			await contract.get_bet_info(account.address, 3);
 		} catch (err) {
 			console.log('####: err: ', err);
 		}
