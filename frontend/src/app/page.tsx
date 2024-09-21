@@ -1,3 +1,5 @@
+'use client';
+
 import Image from "next/image";
 import TokenPrice from './tokenprice'; 
 import DemoComponentStarknetJS from "./components/DemoComponentOld";
